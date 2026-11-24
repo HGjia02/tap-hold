@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编辑器 · Tap Hold 生成器</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="container nav-inner">
+    <div class="logo"><span class="dot"></span> Tap Hold · 编辑器</div>
+    <div class="nav-links">
+      <a href="index.html">← 返回首页</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container editor-wrap">
+  <div class="editor-top">
+    <h2>制作 Tap Hold 图</h2>
+    <div class="toolbar">
+      <div class="seg" id="modeSeg">
+        <button data-mode="hide" class="active">隐藏单图</button>
+        <button data-mode="swap">A+B 交换</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="undoBtn">↩ 撤销</button>
+      <button class="btn btn-ghost btn-sm" id="redoBtn">↪ 重做</button>
+      <button class="btn btn-primary btn-sm" id="exportBtn">⬇ 导出 PNG</button>
+    </div>
+  </div>
+
+  <div class="editor-grid">
+    <!-- 左：上传与图层 -->
+    <div class="panel">
+      <h4>图片 / 图层</h4>
+      <div id="uploadA" class="upload-box upload-area-swap-a" style="display:none">
+        <div class="big">🖼️</div>
+        <div id="labelA">上传图 A（时间线显示）</div>
+      </div>
+      <div id="uploadB" class="upload-box upload-area-swap-b" style="display:none">
+        <div class="big">🌑</div>
+        <div id="labelB">上传图 B（长按显示）</div>
+      </div>
+      <div id="uploadMain" class="upload-box upload-area-hide-main">
+        <div class="big">🖼️</div>
+        <div id="labelMain">上传主图（隐藏单图用）</div>
+      </div>
+      <input type="file" id="fileA" accept="image/*" hidden>
+      <input type="file" id="fileB" accept="image/*" hidden>
+      <input type="file" id="fileMain" accept="image/*" hidden>
+      <p class="panel-note" id="modeHint">当前：隐藏单图 —— 涂白（保留）区域在时间线里直接显示，其余区域长按才浮现。</p>
+
+      <div class="ctrl" style="margin-top:18px">
+        <label>尺寸预设</label>
+        <div class="seg" id="sizeSeg">
+          <button data-size="16:9" class="active">16:9</button>
+          <button data-size="1:1">1:1</button>
+          <button data-size="4:5">4:5</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中：画布 -->
+    <div class="canvas-stage">
+      <div class="canvas-box">
+        <canvas id="canvas" width="1200" height="675"></canvas>
+        <div class="cmp-tag cmp-tag-l" id="cmpTagL">缩略图</div>
+        <div class="cmp-tag cmp-tag-r" id="cmpTagR">点击放大后</div>
+        <div class="cmp-line" id="cmpLine"></div>
+        <div class="cmp-handle" id="cmpHandle" title="按住左右拖动，对比时间线缩略图与长按后的效果">⇄</div>
+      </div>
+      <div class="cmp-note" id="cmpNote">拖动中间的滑块对比：左边 = 时间线缩略图（白底），右边 = 长按查看器（黑底）。</div>
+      <div class="preview-row">
+        <label>实时预览（白底 = 时间线缩略图 / 黑底 = 长按查看器）</label>
+        <div class="compare">
+          <div class="prev"><div class="cap">白底 · 时间线</div><canvas id="prevWhite" width="400" height="225"></canvas></div>
+          <div class="prev"><div class="cap">黑底 · 长按</div><canvas id="prevBlack" width="400" height="225"></canvas></div>
+        </div>
+      </div>
+      <div class="warn" id="publishWarn">⚠️ 导出后请用 <b>电脑桌面浏览器</b> 在 x.com 上传；手机 App 会转 JPEG 毁掉透明效果。上传后等 1–2 分钟再核对。</div>
+    </div>
+
+    <!-- 右：参数 -->
+    <div class="panel">
+      <h4>画笔 / 参数</h4>
+      <div class="ctrl">
+        <label>画笔大小 <b id="brushSizeVal">40</b></label>
+        <input type="range" id="brushSize" min="5" max="200" value="40">
+      </div>
+      <div class="ctrl" id="strengthCtrl">
+        <label>显示强度 <b id="strengthVal">60</b></label>
+        <input type="range" id="strength" min="10" max="100" value="60">
+      </div>
+      <div class="ctrl">
+        <label>亮度 <b id="brightVal">100</b></label>
+        <input type="range" id="bright" min="50" max="150" value="100">
+      </div>
+      <div class="ctrl">
+        <label>对比度 <b id="contrastVal">100</b></label>
+        <input type="range" id="contrast" min="50" max="180" value="100">
+      </div>
+      <div class="ctrl">
+        <label>画笔模式</label>
+        <div class="seg" id="paintSeg">
+          <button data-paint="keep" class="active">涂抹保留</button>
+          <button data-paint="erase">擦除</button>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text-dim)">两个模式都能用画笔：A+B 交换里“擦除”= 把该处涂成透明、“涂抹保留”= 涂回来；隐藏单图里“涂抹保留”= 时间线直接显示、“擦除”= 取消保留。参数按模式各自保存，切换不会互相影响。导出只有 PNG 一种格式。</p>
+    </div>
+  </div>
+</div>
+
+<script src="js/png8.js?v=20261125c"></script>
+<script src="js/editor.js?v=20261125c"></script>
+</body>
+</html>
