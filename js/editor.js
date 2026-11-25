@@ -29,12 +29,15 @@
     brushSize: 40, // 画笔大小属于工具参数，两套模式共用同一个尺寸
 
     // ---- 通道一：A+B 交换（掩码默认全 1 = 全部显示，涂"擦除"变 0 = 该处透明） ----
+    // 白底侧（图 A）与黑底侧（图 B）各有一套亮度/对比度：白侧调低压白雾，黑侧调高加深差异
     swap: {
       imgA: null,
       imgB: null,
       strength: 60,
-      brightness: 100,
-      contrast: 100,
+      brightA: 100,
+      contrastA: 100,
+      brightB: 100,
+      contrastB: 100,
       satur: 100,
       gray: 0,
       mask: null,
@@ -53,6 +56,7 @@
       contrast: 100,
       satur: 100,
       gray: 0,
+      checker: 1,
       mask: null,
       maskW: 0,
       maskH: 0,
@@ -96,6 +100,19 @@
     brightVal: $('brightVal'),
     sliderContrast: $('contrast'),
     contrastVal: $('contrastVal'),
+    sliderBrightA: $('brightA'),
+    brightAVal: $('brightAVal'),
+    sliderContrastA: $('contrastA'),
+    contrastAVal: $('contrastAVal'),
+    sliderBrightB: $('brightB'),
+    brightBVal: $('brightBVal'),
+    sliderContrastB: $('contrastB'),
+    contrastBVal: $('contrastBVal'),
+    splitCtrl: $('splitCtrl'),
+    singleCtrl: $('singleCtrl'),
+    checkerCtrl: $('checkerCtrl'),
+    checkerBtns: document.querySelectorAll('#checkerSeg [data-checker]'),
+    grayPresetBtn: $('grayPresetBtn'),
     sliderSatur: $('satur'),
     saturVal: $('saturVal'),
     saturCtrl: $('saturCtrl'),
@@ -244,9 +261,10 @@
     return data;
   }
 
-  /* ===== 算法一：隐藏单图 —— 棋盘格（原版算法，未改动） =====
+  /* ===== 算法一：隐藏单图 —— 棋盘格 =====
    * 掩码=1 的区域实色；其余区域棋盘格（实色半透明/全透明交替），
    * 白底缩小被平均成淡雾，黑底实色浮现。
+   * checker：棋盘块边长（1=细，3=粗；粗格在手机缩放下不易出摩尔纹）
    */
   function buildHide() {
     const w = state.canvasW, h = state.canvasH;
@@ -257,11 +275,12 @@
     const out = ctxMain.createImageData(w, h);
     const s = src.data, o = out.data;
     const strength = p.strength / 100;
+    const cs = p.checker && p.checker > 0 ? p.checker : 1;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const idx = y * w + x;
         const keep = mask[idx] === 1;
-        const checker = ((x + y) % 2 === 0);
+        const checker = ((Math.floor(x / cs) + Math.floor(y / cs)) % 2 === 0);
         const si = idx * 4;
         if (keep) {
           o[si] = s[si]; o[si + 1] = s[si + 1]; o[si + 2] = s[si + 2]; o[si + 3] = 255;
@@ -276,31 +295,53 @@
     return out;
   }
 
-  /* ===== 算法二：A/B 交换 —— 逐像素 alpha（原版算法） =====
+  /* ===== 算法二：A/B 交换 —— 逐像素 alpha =====
    * 白底(255)显示 A，黑底(0)显示 B。
    * W = C*a + 255*(1-a); B = C*a  =>  a=(255-W)/(255-B), C=B/a
-   * 掩码为 0 的像素 alpha 直接置 0（擦除）；掩码全 1 时输出与原版逐字节一致。
+   * 高光保护：alpha 加到下界 max(B通道/255)，使 C=B/a 恒 <=255，
+   * 从根上消除 C 溢出（溢出被截断时黑底会泛白、露出白底轮廓）。
+   * 掩码为 0 的像素 alpha 直接置 0（擦除）。
    */
+  function swapParamsFor(img) {
+    const s = state.swap;
+    const base = { satur: s.satur, gray: s.gray };
+    if (img === s.imgA) {
+      return Object.assign({ brightness: s.brightA, contrast: s.contrastA }, base);
+    }
+    return Object.assign({ brightness: s.brightB, contrast: s.contrastB }, base);
+  }
+
   function buildSwap() {
     const w = state.canvasW, h = state.canvasH;
     const s = state.swap;
     ensureMaskFor(s, 1);
     const mask = s.mask;
-    const A = getAdjusted('swapA', s.imgA, s).data;
-    const B = getAdjusted('swapB', s.imgB, s).data;
+    const A = getAdjusted('swapA', s.imgA, swapParamsFor(s.imgA)).data;
+    const B = getAdjusted('swapB', s.imgB, swapParamsFor(s.imgB)).data;
     const out = ctxMain.createImageData(w, h);
     const o = out.data;
     for (let i = 0; i < w * h; i++) {
       const si = i * 4;
+      const lW = 0.0722 * A[si] + 0.7152 * A[si + 1] + 0.2126 * A[si + 2];
+      const lB = 0.0722 * B[si] + 0.7152 * B[si + 1] + 0.2126 * B[si + 2];
+      const den = 255 - lB;
+      let alpha = den <= 0 ? 1 : (255 - lW) / den;
+      if (alpha < 0) alpha = 0;
+      if (alpha > 1) alpha = 1;
       for (let k = 0; k < 3; k++) {
-        const W = A[si + k], Bl = B[si + k];
-        let alpha = (255 - W) / (255 - Bl);
-        alpha = Math.max(0, Math.min(1, alpha));
-        let C = Bl / alpha;
-        C = Math.max(0, Math.min(255, C));
-        o[si + k] = C;
-        o[si + 3] = Math.round(alpha * 255);
+        const need = B[si + k] / 255;
+        if (need > alpha) alpha = need;
       }
+      if (alpha > 1) alpha = 1;
+      if (alpha <= 0) {
+        o[si] = 0; o[si + 1] = 0; o[si + 2] = 0; o[si + 3] = 0;
+        continue;
+      }
+      for (let k = 0; k < 3; k++) {
+        const C = Math.round(B[si + k] / alpha);
+        o[si + k] = C > 255 ? 255 : C;
+      }
+      o[si + 3] = Math.round(alpha * 255);
       if (mask[i] === 0) o[si + 3] = 0;
     }
     return out;
@@ -431,8 +472,6 @@
     const base = {
       t: channel,
       strength: ch.strength,
-      brightness: ch.brightness,
-      contrast: ch.contrast,
       satur: ch.satur,
       gray: ch.gray,
       mask: ch.mask ? ch.mask.slice() : null,
@@ -442,8 +481,15 @@
     if (channel === 'swap') {
       base.imgA = ch.imgA;
       base.imgB = ch.imgB;
+      base.brightA = ch.brightA;
+      base.contrastA = ch.contrastA;
+      base.brightB = ch.brightB;
+      base.contrastB = ch.contrastB;
     } else {
       base.imgMain = ch.imgMain;
+      base.brightness = ch.brightness;
+      base.contrast = ch.contrast;
+      base.checker = ch.checker;
     }
     return base;
   }
@@ -462,12 +508,17 @@
     if (snap.t === 'swap') {
       ch.imgA = snap.imgA;
       ch.imgB = snap.imgB;
+      ch.brightA = snap.brightA;
+      ch.contrastA = snap.contrastA;
+      ch.brightB = snap.brightB;
+      ch.contrastB = snap.contrastB;
     } else {
       ch.imgMain = snap.imgMain;
+      ch.brightness = snap.brightness;
+      ch.contrast = snap.contrast;
+      ch.checker = snap.checker == null ? 1 : snap.checker;
     }
     ch.strength = snap.strength;
-    ch.brightness = snap.brightness;
-    ch.contrast = snap.contrast;
     ch.satur = snap.satur == null ? 100 : snap.satur;
     ch.gray = snap.gray || 0;
     ch.mask = snap.mask ? snap.mask.slice() : null;
@@ -507,11 +558,24 @@
     const isSwap = state.mode === 'swap';
     const p = currentChannel();
     dom.sliderStrength.value = p.strength;
-    dom.sliderBrightness.value = p.brightness;
-    dom.sliderContrast.value = p.contrast;
     dom.strengthVal.textContent = p.strength;
-    dom.brightVal.textContent = p.brightness;
-    dom.contrastVal.textContent = p.contrast;
+
+    if (isSwap) {
+      dom.sliderBrightA.value = p.brightA;
+      dom.sliderContrastA.value = p.contrastA;
+      dom.sliderBrightB.value = p.brightB;
+      dom.sliderContrastB.value = p.contrastB;
+      dom.brightAVal.textContent = p.brightA;
+      dom.contrastAVal.textContent = p.contrastA;
+      dom.brightBVal.textContent = p.brightB;
+      dom.contrastBVal.textContent = p.contrastB;
+    } else {
+      dom.sliderBrightness.value = p.brightness;
+      dom.sliderContrast.value = p.contrast;
+      dom.brightVal.textContent = p.brightness;
+      dom.contrastVal.textContent = p.contrast;
+      dom.checkerBtns.forEach(b => b.classList.toggle('active', Number(b.dataset.checker) === (p.checker || 1)));
+    }
     if (dom.sliderSatur) {
       dom.sliderSatur.value = p.satur == null ? 100 : p.satur;
       dom.saturVal.textContent = p.gray ? '灰度' : (p.satur == null ? 100 : p.satur);
@@ -543,6 +607,11 @@
 
     // 显示强度只作用于隐藏单图的棋盘格；A+B 交换的 alpha 解方程不读它
     if (dom.strengthCtrl) dom.strengthCtrl.style.display = isSwap ? 'none' : '';
+
+    // 参数面板分组：交换模式给两侧各一套，单图模式给一套 + 棋盘格粒度
+    if (dom.splitCtrl) dom.splitCtrl.style.display = isSwap ? '' : 'none';
+    if (dom.singleCtrl) dom.singleCtrl.style.display = isSwap ? 'none' : '';
+    if (dom.checkerCtrl) dom.checkerCtrl.style.display = isSwap ? 'none' : '';
 
     // 拖动对比只在交换模式提供；隐藏单图整张白底显示，避免 ⇄ 按钮挡住画笔
     [dom.cmpHandle, dom.cmpLine, dom.cmpTagL, dom.cmpTagR].forEach(el => {
@@ -739,9 +808,41 @@
   function bindSliders() {
     bindRange(dom.sliderBrushSize, dom.brushSizeVal, () => state, 'brushSize');
     bindRange(dom.sliderStrength, dom.strengthVal, () => currentChannel(), 'strength');
+    // 交换模式：白底侧 / 黑底侧各一套，直接写进 state.swap，不随模式切换串值
+    bindRange(dom.sliderBrightA, dom.brightAVal, () => state.swap, 'brightA');
+    bindRange(dom.sliderContrastA, dom.contrastAVal, () => state.swap, 'contrastA');
+    bindRange(dom.sliderBrightB, dom.brightBVal, () => state.swap, 'brightB');
+    bindRange(dom.sliderContrastB, dom.contrastBVal, () => state.swap, 'contrastB');
+    // 单图模式
     bindRange(dom.sliderBrightness, dom.brightVal, () => currentChannel(), 'brightness');
     bindRange(dom.sliderContrast, dom.contrastVal, () => currentChannel(), 'contrast');
     if (dom.sliderSatur) bindRange(dom.sliderSatur, dom.saturVal, () => currentChannel(), 'satur');
+
+    dom.checkerBtns.forEach(btn => {
+      btn.onclick = () => {
+        state.hide.checker = Number(btn.dataset.checker) || 1;
+        syncControlPanel();
+        pushHistory('hide');
+        render();
+      };
+    });
+
+    if (dom.grayPresetBtn) {
+      dom.grayPresetBtn.onclick = () => {
+        const p = currentChannel();
+        p.gray = 1;
+        if (state.mode === 'swap') {
+          // 白侧退离 255、黑侧加深差异：消白雾的同时保住暗部
+          p.brightA = 100; p.contrastA = 95;
+          p.brightB = 100; p.contrastB = 125;
+        } else {
+          p.brightness = 100; p.contrast = 120;
+        }
+        syncControlPanel();
+        pushHistory(state.mode);
+        render();
+      };
+    }
 
     dom.grayBtns.forEach(btn => {
       btn.onclick = () => {

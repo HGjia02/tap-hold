@@ -94,23 +94,60 @@
         <label>显示强度 <b id="strengthVal">60</b></label>
         <input type="range" id="strength" min="10" max="100" value="60">
       </div>
-      <div class="ctrl">
-        <label>亮度 <b id="brightVal">100</b></label>
-        <input type="range" id="bright" min="50" max="150" value="100">
+
+      <!-- A+B 交换：白底侧 / 黑底侧 各自一套亮度·对比度 -->
+      <div id="splitCtrl">
+        <div class="ctrl">
+          <label>白底侧（图 A）亮度 <b id="brightAVal">100</b></label>
+          <input type="range" id="brightA" min="50" max="150" value="100">
+        </div>
+        <div class="ctrl">
+          <label>白底侧（图 A）对比度 <b id="contrastAVal">100</b></label>
+          <input type="range" id="contrastA" min="50" max="180" value="100">
+        </div>
+        <div class="ctrl">
+          <label>黑底侧（图 B）亮度 <b id="brightBVal">100</b></label>
+          <input type="range" id="brightB" min="50" max="150" value="100">
+        </div>
+        <div class="ctrl">
+          <label>黑底侧（图 B）对比度 <b id="contrastBVal">100</b></label>
+          <input type="range" id="contrastB" min="50" max="200" value="100">
+        </div>
+        <p class="panel-note">白底侧调低对比度 = 把白色从 255 往回拽，压掉黑底泛白；黑底侧调高对比度 = 加深差异区，同时给 C 腾出余量。</p>
       </div>
-      <div class="ctrl">
-        <label>对比度 <b id="contrastVal">100</b></label>
-        <input type="range" id="contrast" min="50" max="180" value="100">
+
+      <!-- 隐藏单图：只有一张底图，保留单一组 -->
+      <div id="singleCtrl">
+        <div class="ctrl">
+          <label>亮度 <b id="brightVal">100</b></label>
+          <input type="range" id="bright" min="50" max="150" value="100">
+        </div>
+        <div class="ctrl">
+          <label>对比度 <b id="contrastVal">100</b></label>
+          <input type="range" id="contrast" min="50" max="180" value="100">
+        </div>
       </div>
+
+      <div class="ctrl" id="checkerCtrl" style="display:none">
+        <label>棋盘格粒度</label>
+        <div class="seg" id="checkerSeg">
+          <button data-checker="1" class="active">细</button>
+          <button data-checker="3">粗</button>
+        </div>
+      </div>
+
       <div class="ctrl" id="saturCtrl">
         <label>饱和度 <b id="saturVal">100</b></label>
         <input type="range" id="satur" min="0" max="200" value="100">
       </div>
       <div class="ctrl">
         <label>灰度</label>
-        <div class="seg" id="graySeg">
-          <button data-gray="0" class="active">彩色</button>
-          <button data-gray="1">灰度</button>
+        <div class="row-inline">
+          <div class="seg" id="graySeg">
+            <button data-gray="0" class="active">彩色</button>
+            <button data-gray="1">灰度</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="grayPresetBtn">一键灰度优化</button>
         </div>
       </div>
       <div class="ctrl">
@@ -125,7 +162,7 @@
   </div>
 </div>
 
-<script src="js/png8.js?v=20261125d"></script>
-<script src="js/editor.js?v=20261125d"></script>
+<script src="js/png8.js?v=20261125e"></script>
+<script src="js/editor.js?v=20261125e"></script>
 </body>
 </html>

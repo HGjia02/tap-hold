@@ -179,3 +179,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   .demo { grid-template-columns: 1fr; }
   .demo-mid { justify-content: center; padding: 10px; }
 }
+
+/* 参数面板：开关行内并排 */
+.row-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
