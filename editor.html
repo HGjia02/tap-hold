@@ -102,6 +102,17 @@
         <label>对比度 <b id="contrastVal">100</b></label>
         <input type="range" id="contrast" min="50" max="180" value="100">
       </div>
+      <div class="ctrl" id="saturCtrl">
+        <label>饱和度 <b id="saturVal">100</b></label>
+        <input type="range" id="satur" min="0" max="200" value="100">
+      </div>
+      <div class="ctrl">
+        <label>灰度</label>
+        <div class="seg" id="graySeg">
+          <button data-gray="0" class="active">彩色</button>
+          <button data-gray="1">灰度</button>
+        </div>
+      </div>
       <div class="ctrl">
         <label>画笔模式</label>
         <div class="seg" id="paintSeg">
@@ -114,7 +125,7 @@
   </div>
 </div>
 
-<script src="js/png8.js?v=20261125c"></script>
-<script src="js/editor.js?v=20261125c"></script>
+<script src="js/png8.js?v=20261125d"></script>
+<script src="js/editor.js?v=20261125d"></script>
 </body>
 </html>

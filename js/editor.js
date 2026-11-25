@@ -35,6 +35,8 @@
       strength: 60,
       brightness: 100,
       contrast: 100,
+      satur: 100,
+      gray: 0,
       mask: null,
       maskW: 0,
       maskH: 0,
@@ -49,6 +51,8 @@
       strength: 60,
       brightness: 100,
       contrast: 100,
+      satur: 100,
+      gray: 0,
       mask: null,
       maskW: 0,
       maskH: 0,
@@ -92,6 +96,10 @@
     brightVal: $('brightVal'),
     sliderContrast: $('contrast'),
     contrastVal: $('contrastVal'),
+    sliderSatur: $('satur'),
+    saturVal: $('saturVal'),
+    saturCtrl: $('saturCtrl'),
+    grayBtns: document.querySelectorAll('#graySeg [data-gray]'),
 
     btnKeep: document.querySelector('#paintSeg [data-paint="keep"]'),
     btnErase: document.querySelector('#paintSeg [data-paint="erase"]'),
@@ -187,16 +195,27 @@
     return cc.getImageData(0, 0, w, h);
   }
 
-  // 亮度 / 对比度（按通道参数）
+  // 饱和度 / 灰度 / 亮度 / 对比度（按通道参数）
+  // satur：0=完全去色，100=原样，200=双倍饱和；gray=1 直接强制去色
   function adjust(idata, p) {
     const d = idata.data;
+    const s = p.gray ? 0 : (p.satur == null ? 1 : p.satur / 100);
     const c = p.contrast / 100, b = p.brightness / 100;
+    const clamp = v => (v < 0 ? 0 : v > 255 ? 255 : v);
     for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], bl = d[i + 2];
+      if (s !== 1) {
+        // 按亮度（Rec.709）做去色/加饱和，灰度开关等价于 s=0
+        const y = 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+        d[i] = clamp(y + (r - y) * s);
+        d[i + 1] = clamp(y + (g - y) * s);
+        d[i + 2] = clamp(y + (bl - y) * s);
+      }
       for (let k = 0; k < 3; k++) {
         let v = d[i + k];
         v = (v - 128) * c + 128;
         v = v * b;
-        d[i + k] = Math.max(0, Math.min(255, v));
+        d[i + k] = clamp(v);
       }
     }
     return idata;
@@ -212,13 +231,15 @@
   function getAdjusted(key, img, p) {
     const hit = srcCache[key];
     if (hit && hit.img === img && hit.w === state.canvasW && hit.h === state.canvasH
-      && hit.bright === p.brightness && hit.contrast === p.contrast) {
+      && hit.bright === p.brightness && hit.contrast === p.contrast
+      && hit.satur === p.satur && hit.gray === p.gray) {
       return hit.data;
     }
     const data = adjust(getSourceImageData(img), p);
     srcCache[key] = {
       img, w: state.canvasW, h: state.canvasH,
-      bright: p.brightness, contrast: p.contrast, data,
+      bright: p.brightness, contrast: p.contrast,
+      satur: p.satur, gray: p.gray, data,
     };
     return data;
   }
@@ -412,6 +433,8 @@
       strength: ch.strength,
       brightness: ch.brightness,
       contrast: ch.contrast,
+      satur: ch.satur,
+      gray: ch.gray,
       mask: ch.mask ? ch.mask.slice() : null,
       maskW: ch.maskW,
       maskH: ch.maskH,
@@ -445,6 +468,8 @@
     ch.strength = snap.strength;
     ch.brightness = snap.brightness;
     ch.contrast = snap.contrast;
+    ch.satur = snap.satur == null ? 100 : snap.satur;
+    ch.gray = snap.gray || 0;
     ch.mask = snap.mask ? snap.mask.slice() : null;
     ch.maskW = snap.maskW;
     ch.maskH = snap.maskH;
@@ -487,6 +512,13 @@
     dom.strengthVal.textContent = p.strength;
     dom.brightVal.textContent = p.brightness;
     dom.contrastVal.textContent = p.contrast;
+    if (dom.sliderSatur) {
+      dom.sliderSatur.value = p.satur == null ? 100 : p.satur;
+      dom.saturVal.textContent = p.gray ? '灰度' : (p.satur == null ? 100 : p.satur);
+      dom.grayBtns.forEach(b => b.classList.toggle('active', Number(b.dataset.gray) === (p.gray ? 1 : 0)));
+      // 灰度打开时饱和度滑块失效，视觉上压暗提示
+      if (dom.saturCtrl) dom.saturCtrl.classList.toggle('disabled', !!p.gray);
+    }
     dom.sliderBrushSize.value = state.brushSize;
     dom.brushSizeVal.textContent = state.brushSize;
     dom.btnKeep.classList.toggle('active', p.brushMode === 'keep');
@@ -709,6 +741,17 @@
     bindRange(dom.sliderStrength, dom.strengthVal, () => currentChannel(), 'strength');
     bindRange(dom.sliderBrightness, dom.brightVal, () => currentChannel(), 'brightness');
     bindRange(dom.sliderContrast, dom.contrastVal, () => currentChannel(), 'contrast');
+    if (dom.sliderSatur) bindRange(dom.sliderSatur, dom.saturVal, () => currentChannel(), 'satur');
+
+    dom.grayBtns.forEach(btn => {
+      btn.onclick = () => {
+        const p = currentChannel();
+        p.gray = Number(btn.dataset.gray) === 1 ? 1 : 0;
+        syncControlPanel();
+        pushHistory(state.mode);
+        render();
+      };
+    });
 
     dom.btnKeep.onclick = () => {
       currentChannel().brushMode = 'keep';

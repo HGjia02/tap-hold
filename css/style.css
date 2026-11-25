@@ -143,6 +143,8 @@ footer { border-top: 1px solid var(--line); padding: 30px 0; text-align: center;
 .ctrl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
 .ctrl label b { color: var(--text); }
 input[type=range] { width: 100%; accent-color: var(--accent); }
+.ctrl.disabled { opacity: .45; }
+.ctrl.disabled input[type=range] { pointer-events: none; }
 .seg { display: flex; background: var(--bg-soft); border-radius: 10px; padding: 4px; gap: 4px; margin-bottom: 16px; }
 .seg button { flex: 1; background: transparent; color: var(--text-dim); border: 0; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
 .seg button.active { background: var(--accent); color: #06281a; font-weight: 700; }
